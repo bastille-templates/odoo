@@ -1,0 +1,75 @@
+#!/bin/sh
+# =============================================================================
+# FreeBSD rc.d - Skrip Servis Odoo ${ODOO_BRANCH}
+# Dijana oleh BastilleBSD Template
+# =============================================================================
+# PROVIDE: odoo
+# REQUIRE: LOGIN postgresql
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="odoo"
+rcvar="odoo_enable"
+desc="Odoo Business Application Server v${ODOO_BRANCH}"
+
+# Konfigurasi lalai
+: ${odoo_enable:="NO"}
+: ${odoo_user:="${ODOO_USER}"}
+: ${odoo_group:="${ODOO_USER}"}
+: ${odoo_home:="${ODOO_HOME}"}
+: ${odoo_config:="/usr/local/etc/odoo/odoo.conf"}
+: ${odoo_logfile:="/var/log/odoo/odoo-${ODOO_BRANCH}.log"}
+: ${odoo_pidfile:="/var/run/odoo/odoo.pid"}
+: ${odoo_python:="/usr/local/bin/python${PYTHON_VER}"}
+: ${odoo_bin:="${ODOO_HOME}/src/odoo-bin"}
+: ${odoo_flags:=""}
+
+command="${odoo_python}"
+command_args="${odoo_bin} --config=${odoo_config} --logfile=${odoo_logfile} --pidfile=${odoo_pidfile} ${odoo_flags}"
+command_interpreter="${odoo_python}"
+
+pidfile="${odoo_pidfile}"
+
+# Buat direktori yang diperlukan sebelum start
+start_precmd="odoo_precmd"
+stop_postcmd="odoo_postcmd"
+
+odoo_precmd() {
+    if [ ! -d /var/run/odoo ]; then
+        mkdir -p /var/run/odoo
+        chown ${odoo_user}:${odoo_group} /var/run/odoo
+    fi
+    if [ ! -d /var/log/odoo ]; then
+        mkdir -p /var/log/odoo
+        chown ${odoo_user}:${odoo_group} /var/log/odoo
+    fi
+    if [ ! -d ${odoo_home}/data ]; then
+        mkdir -p ${odoo_home}/data
+        chown ${odoo_user}:${odoo_group} ${odoo_home}/data
+    fi
+}
+
+odoo_postcmd() {
+    # Buang pidfile jika masih ada selepas stop
+    if [ -f "${odoo_pidfile}" ]; then
+        rm -f "${odoo_pidfile}"
+    fi
+}
+
+# Guna daemon untuk jalankan dengan pengguna yang betul
+start_cmd="odoo_start"
+
+odoo_start() {
+    echo "Memulakan Odoo ${ODOO_BRANCH}..."
+    /usr/sbin/daemon \
+        -u ${odoo_user} \
+        -p ${odoo_pidfile} \
+        -o ${odoo_logfile} \
+        -f \
+        ${command} ${command_args}
+    echo "Odoo ${ODOO_BRANCH} dimulakan."
+}
+
+load_rc_config ${name}
+run_rc_command "$1"

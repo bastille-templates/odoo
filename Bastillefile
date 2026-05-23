@@ -1,12 +1,175 @@
-CONFIG set sysvshm=new
-RESTART
-ARG psql-version=13
-ARG odoo-version=16.0
-PKG git-lite python311 py311-pip py311-postgresql py311-lxml py311-ldap3 postgresql${psql-version}-server wkhtmltopdf rust
-SYSRC postgresql_enable=YES
+#!/usr/bin/env sh
+# =============================================================================
+# BastilleBSD Template - Odoo Source Install (Dinamik / Multi-Versi)
+# =============================================================================
+# Penggunaan:
+#   bastille template <JAIL> path/to/bastille-odoo \
+#       --arg ODOO_VERSION=18 \
+#       --arg ODOO_BRANCH=18.0 \
+#       --arg ODOO_USER=odoo \
+#       --arg ODOO_HOME=/usr/local/odoo \
+#       --arg ODOO_PORT=8069 \
+#       --arg DB_HOST=localhost \
+#       --arg DB_PORT=5432 \
+#       --arg DB_USER=odoo \
+#       --arg DB_PASSWORD=changeme \
+#       --arg ADMIN_PASSWD=admin_secret \
+#       --arg WORKERS=4 \
+#       --arg INSTALL_WKHTMLTOPDF=yes
+# =============================================================================
+
+# ----------------------------------------------------------------------------
+# ARG - Parameter Dinamik (ikut versi Odoo)
+# ----------------------------------------------------------------------------
+ARG ODOO_VERSION=18
+ARG ODOO_BRANCH=18.0
+ARG ODOO_USER=odoo
+ARG ODOO_HOME=/usr/local/odoo
+ARG ODOO_PORT=8069
+ARG ODOO_LONGPOLL_PORT=8072
+ARG DB_HOST=localhost
+ARG DB_PORT=5432
+ARG DB_USER=odoo
+ARG DB_PASSWORD=changeme
+ARG ADMIN_PASSWD=admin_secret
+ARG WORKERS=4
+ARG MAX_CRON_THREADS=2
+ARG INSTALL_WKHTMLTOPDF=yes
+ARG FREEBSD_VERSION=14
+ARG PYTHON_VER=311
+ARG LOG_LEVEL=info
+ARG LIMIT_TIME_CPU=600
+ARG LIMIT_TIME_REAL=1200
+ARG LIMIT_MEMORY_HARD=2684354560
+ARG LIMIT_MEMORY_SOFT=2147483648
+
+# ----------------------------------------------------------------------------
+# PKG - Install pakej sistem
+# Nota: Python version disesuaikan mengikut keperluan Odoo
+#   Odoo 16+  : Python 3.10+ (py310)
+#   Odoo 17+  : Python 3.10+ (py310/py311)
+#   Odoo 18+  : Python 3.10+ (py311 disyorkan)
+# ----------------------------------------------------------------------------
+PKG pkg
+PKG git
+PKG sudo
+PKG bash
+PKG curl
+PKG wget
+PKG ca_root_nss
+PKG python${PYTHON_VER}
+PKG py${PYTHON_VER}-pip
+PKG py${PYTHON_VER}-setuptools
+PKG py${PYTHON_VER}-wheel
+PKG py${PYTHON_VER}-psycopg2
+PKG py${PYTHON_VER}-lxml
+PKG py${PYTHON_VER}-Pillow
+PKG py${PYTHON_VER}-reportlab
+PKG py${PYTHON_VER}-passlib
+PKG py${PYTHON_VER}-cryptography
+PKG py${PYTHON_VER}-openssl
+PKG py${PYTHON_VER}-ldap3
+PKG py${PYTHON_VER}-gevent
+PKG py${PYTHON_VER}-greenlet
+PKG py${PYTHON_VER}-requests
+PKG py${PYTHON_VER}-pytz
+PKG py${PYTHON_VER}-yaml
+PKG py${PYTHON_VER}-dateutil
+PKG py${PYTHON_VER}-markupsafe
+PKG py${PYTHON_VER}-jinja2
+PKG py${PYTHON_VER}-babel
+PKG py${PYTHON_VER}-chardet
+PKG py${PYTHON_VER}-decorator
+PKG py${PYTHON_VER}-docutils
+PKG py${PYTHON_VER}-html2text
+PKG py${PYTHON_VER}-idna
+PKG py${PYTHON_VER}-num2words
+PKG py${PYTHON_VER}-ofxparse
+PKG py${PYTHON_VER}-polib
+PKG py${PYTHON_VER}-psutil
+PKG py${PYTHON_VER}-pydot
+PKG py${PYTHON_VER}-pypdf2
+PKG py${PYTHON_VER}-qrcode
+PKG py${PYTHON_VER}-serial
+PKG py${PYTHON_VER}-stdnum
+PKG py${PYTHON_VER}-vobject
+PKG py${PYTHON_VER}-werkzeug
+PKG py${PYTHON_VER}-xlrd
+PKG py${PYTHON_VER}-xlwt
+PKG py${PYTHON_VER}-xlsxwriter
+PKG py${PYTHON_VER}-libsass
+PKG postgresql${FREEBSD_VERSION}-client
+PKG node20
+PKG npm-node20
+PKG libxml2
+PKG libxslt
+PKG openldap26-client
+PKG wkhtmltopdf
+
+# ----------------------------------------------------------------------------
+# SYSRC - Konfigurasi rc.conf dalam jail
+# ----------------------------------------------------------------------------
 SYSRC odoo_enable=YES
-OVERLAY root
-OVERLAY usr
-CMD chmod +x /usr/local/etc/rc.d/odoo
-RENDER root/bootstrap_odoo.sh
-CMD /root/bootstrap_odoo.sh
+SYSRC postgresql_enable=NO
+
+# ----------------------------------------------------------------------------
+# CMD - Jalankan arahan shell dalam jail untuk setup Odoo dari source
+# ----------------------------------------------------------------------------
+
+# Cipta pengguna sistem untuk Odoo
+CMD pw groupadd -n ${ODOO_USER} -g 1001 || true
+CMD pw useradd -n ${ODOO_USER} -u 1001 -g ${ODOO_USER} -d ${ODOO_HOME} -s /usr/sbin/nologin -c "Odoo Service User" || true
+
+# Direktori kerja
+CMD mkdir -p ${ODOO_HOME}/src
+CMD mkdir -p ${ODOO_HOME}/addons/custom
+CMD mkdir -p /var/log/odoo
+CMD mkdir -p /var/run/odoo
+
+# Clone source Odoo dari GitHub (branch dinamik ikut versi)
+CMD git clone --depth 1 --branch ${ODOO_BRANCH} https://github.com/odoo/odoo.git ${ODOO_HOME}/src
+
+# Install requirements Python via pip
+CMD python${PYTHON_VER} -m pip install -r ${ODOO_HOME}/src/requirements.txt --no-warn-script-location
+
+# Set symlink python3 → versi yang dipasang
+CMD ln -sf /usr/local/bin/python${PYTHON_VER} /usr/local/bin/python3 || true
+CMD ln -sf /usr/local/bin/python${PYTHON_VER} /usr/local/bin/python || true
+
+# Build aset Node.js (rtl, CSS)
+CMD npm install -g less less-plugin-clean-css || true
+CMD npm install -g rtlcss || true
+
+# Tetapkan pemilikan fail
+CMD chown -R ${ODOO_USER}:${ODOO_USER} ${ODOO_HOME}
+CMD chown -R ${ODOO_USER}:${ODOO_USER} /var/log/odoo
+CMD chown -R ${ODOO_USER}:${ODOO_USER} /var/run/odoo
+
+# Buat symlink binary odoo
+CMD ln -sf ${ODOO_HOME}/src/odoo-bin /usr/local/bin/odoo || true
+
+# ----------------------------------------------------------------------------
+# CP - Salin fail overlay dari template ke dalam jail
+# ----------------------------------------------------------------------------
+CP usr /
+
+# ----------------------------------------------------------------------------
+# RENDER - Gantikan ARG values dalam fail konfigurasi
+# ----------------------------------------------------------------------------
+RENDER /usr/local/etc/odoo/odoo.conf
+RENDER /etc/rc.d/odoo
+
+# Tetapkan permission rc script
+CMD chmod 755 /etc/rc.d/odoo
+
+# ----------------------------------------------------------------------------
+# SERVICE - Mulakan servis
+# ----------------------------------------------------------------------------
+SERVICE odoo start
+
+# ----------------------------------------------------------------------------
+# RDR - Redirect port dari host ke jail (uncomment jika diperlukan)
+# Nota: Gunakan bastille rdr selepas template diapply
+# ----------------------------------------------------------------------------
+# RDR tcp ${ODOO_PORT} ${ODOO_PORT}
+# RDR tcp ${ODOO_LONGPOLL_PORT} ${ODOO_LONGPOLL_PORT}
