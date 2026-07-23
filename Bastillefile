@@ -4,8 +4,8 @@ ARG PHP_V=82
 INCLUDE https://github.com/bastille-templates/apache
 INCLUDE https://github.com/bastille-templates/php
 
-PKG phpphp${PHP_V}-mysql phpphp${PHP_V}-ldap phpphp${PHP_V}-cli phpphp${PHP_V}-soap \
-  phpphp${PHP_V}-xml phpphp${PHP_V}-gd phpphp${PHP_V}-zip phpphp${PHP_V}-mbstring phpphp${PHP_V}-curl \
+PKG php${PHP_V}-mysql php${PHP_V}-ldap php${PHP_V}-cli php${PHP_V}-soap \
+  php${PHP_V}-xml php${PHP_V}-gd php${PHP_V}-zip php${PHP_V}-mbstring php${PHP_V}-curl \
   php${PHP_V}-opcache php${PHP_V}-session php${PHP_V}-filter php${PHP_V}-dom php${PHP_V}-ctype php${PHP_V}-tokenizer \
   php${PHP_V}-phar php${PHP_V}-posix graphviz unzip
 
