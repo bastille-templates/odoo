@@ -11,8 +11,6 @@ PKG php${PHP_V}-mysqli php${PHP_V}-ldap php${PHP_V}-soap php${PHP_V}-xml php${PH
 
   
 # copy files
-CP root /
-CP usr /
 
 # Apache configuration PHP disablle prefork, enable event 
 CMD sed -i '' '/mod_mpm_event.so/s/#LoadModule/LoadModule/' /usr/local/etc/apache24/httpd.conf
