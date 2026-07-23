@@ -1,175 +1,48 @@
-#!/usr/bin/env sh
-# =============================================================================
-# BastilleBSD Template - Odoo Source Install (Dinamik / Multi-Versi)
-# =============================================================================
-# Penggunaan:
-#   bastille template <JAIL> path/to/bastille-odoo \
-#       --arg ODOO_VERSION=18 \
-#       --arg ODOO_BRANCH=18.0 \
-#       --arg ODOO_USER=odoo \
-#       --arg ODOO_HOME=/usr/local/odoo \
-#       --arg ODOO_PORT=8069 \
-#       --arg DB_HOST=localhost \
-#       --arg DB_PORT=5432 \
-#       --arg DB_USER=odoo \
-#       --arg DB_PASSWORD=changeme \
-#       --arg ADMIN_PASSWD=admin_secret \
-#       --arg WORKERS=4 \
-#       --arg INSTALL_WKHTMLTOPDF=yes
-# =============================================================================
+ARG PHP_V=82
 
-# ----------------------------------------------------------------------------
-# ARG - Parameter Dinamik (ikut versi Odoo)
-# ----------------------------------------------------------------------------
-ARG ODOO_VERSION=18
-ARG ODOO_BRANCH=18.0
-ARG ODOO_USER=odoo
-ARG ODOO_HOME=/usr/local/odoo
-ARG ODOO_PORT=8069
-ARG ODOO_LONGPOLL_PORT=8072
-ARG DB_HOST=localhost
-ARG DB_PORT=5432
-ARG DB_USER=odoo
-ARG DB_PASSWORD=changeme
-ARG ADMIN_PASSWD=admin_secret
-ARG WORKERS=4
-ARG MAX_CRON_THREADS=2
-ARG INSTALL_WKHTMLTOPDF=yes
-ARG FREEBSD_VERSION=14
-ARG PYTHON_VER=311
-ARG LOG_LEVEL=info
-ARG LIMIT_TIME_CPU=600
-ARG LIMIT_TIME_REAL=1200
-ARG LIMIT_MEMORY_HARD=2684354560
-ARG LIMIT_MEMORY_SOFT=2147483648
+# install required
+INCLUDE https://github.com/bastille-templates/apache
+INCLUDE https://github.com/bastille-templates/php
 
-# ----------------------------------------------------------------------------
-# PKG - Install pakej sistem
-# Nota: Python version disesuaikan mengikut keperluan Odoo
-#   Odoo 16+  : Python 3.10+ (py310)
-#   Odoo 17+  : Python 3.10+ (py310/py311)
-#   Odoo 18+  : Python 3.10+ (py311 disyorkan)
-# ----------------------------------------------------------------------------
-PKG pkg
-PKG git
-PKG sudo
-PKG bash
-PKG curl
-PKG wget
-PKG ca_root_nss
-PKG python${PYTHON_VER}
-PKG py${PYTHON_VER}-pip
-PKG py${PYTHON_VER}-setuptools
-PKG py${PYTHON_VER}-wheel
-PKG py${PYTHON_VER}-psycopg2
-PKG py${PYTHON_VER}-lxml
-PKG py${PYTHON_VER}-Pillow
-PKG py${PYTHON_VER}-reportlab
-PKG py${PYTHON_VER}-passlib
-PKG py${PYTHON_VER}-cryptography
-PKG py${PYTHON_VER}-openssl
-PKG py${PYTHON_VER}-ldap3
-PKG py${PYTHON_VER}-gevent
-PKG py${PYTHON_VER}-greenlet
-PKG py${PYTHON_VER}-requests
-PKG py${PYTHON_VER}-pytz
-PKG py${PYTHON_VER}-yaml
-PKG py${PYTHON_VER}-dateutil
-PKG py${PYTHON_VER}-markupsafe
-PKG py${PYTHON_VER}-jinja2
-PKG py${PYTHON_VER}-babel
-PKG py${PYTHON_VER}-chardet
-PKG py${PYTHON_VER}-decorator
-PKG py${PYTHON_VER}-docutils
-PKG py${PYTHON_VER}-html2text
-PKG py${PYTHON_VER}-idna
-PKG py${PYTHON_VER}-num2words
-PKG py${PYTHON_VER}-ofxparse
-PKG py${PYTHON_VER}-polib
-PKG py${PYTHON_VER}-psutil
-PKG py${PYTHON_VER}-pydot
-PKG py${PYTHON_VER}-pypdf2
-PKG py${PYTHON_VER}-qrcode
-PKG py${PYTHON_VER}-serial
-PKG py${PYTHON_VER}-stdnum
-PKG py${PYTHON_VER}-vobject
-PKG py${PYTHON_VER}-werkzeug
-PKG py${PYTHON_VER}-xlrd
-PKG py${PYTHON_VER}-xlwt
-PKG py${PYTHON_VER}-xlsxwriter
-PKG py${PYTHON_VER}-libsass
-PKG postgresql${FREEBSD_VERSION}-client
-PKG node20
-PKG npm-node20
-PKG libxml2
-PKG libxslt
-PKG openldap26-client
-PKG wkhtmltopdf
+PKG phpphp${PHP_V}-mysql phpphp${PHP_V}-ldap phpphp${PHP_V}-cli phpphp${PHP_V}-soap \
+  phpphp${PHP_V}-xml phpphp${PHP_V}-gd phpphp${PHP_V}-zip phpphp${PHP_V}-mbstring phpphp${PHP_V}-curl \
+  php${PHP_V}-opcache php${PHP_V}-session php${PHP_V}-filter php${PHP_V}-dom php${PHP_V}-ctype php${PHP_V}-tokenizer \
+  php${PHP_V}-phar php${PHP_V}-posix graphviz unzip
 
-# ----------------------------------------------------------------------------
-# SYSRC - Konfigurasi rc.conf dalam jail
-# ----------------------------------------------------------------------------
-SYSRC odoo_enable=YES
-SYSRC postgresql_enable=NO
-
-# ----------------------------------------------------------------------------
-# CMD - Jalankan arahan shell dalam jail untuk setup Odoo dari source
-# ----------------------------------------------------------------------------
-
-# Cipta pengguna sistem untuk Odoo
-CMD pw groupadd -n ${ODOO_USER} -g 1001 || true
-CMD pw useradd -n ${ODOO_USER} -u 1001 -g ${ODOO_USER} -d ${ODOO_HOME} -s /usr/sbin/nologin -c "Odoo Service User" || true
-
-# Direktori kerja
-CMD mkdir -p ${ODOO_HOME}/src
-CMD mkdir -p ${ODOO_HOME}/addons/custom
-CMD mkdir -p /var/log/odoo
-CMD mkdir -p /var/run/odoo
-
-# Clone source Odoo dari GitHub (branch dinamik ikut versi)
-CMD git clone --depth 1 --branch ${ODOO_BRANCH} https://github.com/odoo/odoo.git ${ODOO_HOME}/src
-
-# Install requirements Python via pip
-CMD python${PYTHON_VER} -m pip install -r ${ODOO_HOME}/src/requirements.txt --no-warn-script-location
-
-# Set symlink python3 → versi yang dipasang
-CMD ln -sf /usr/local/bin/python${PYTHON_VER} /usr/local/bin/python3 || true
-CMD ln -sf /usr/local/bin/python${PYTHON_VER} /usr/local/bin/python || true
-
-# Build aset Node.js (rtl, CSS)
-CMD npm install -g less less-plugin-clean-css || true
-CMD npm install -g rtlcss || true
-
-# Tetapkan pemilikan fail
-CMD chown -R ${ODOO_USER}:${ODOO_USER} ${ODOO_HOME}
-CMD chown -R ${ODOO_USER}:${ODOO_USER} /var/log/odoo
-CMD chown -R ${ODOO_USER}:${ODOO_USER} /var/run/odoo
-
-# Buat symlink binary odoo
-CMD ln -sf ${ODOO_HOME}/src/odoo-bin /usr/local/bin/odoo || true
-
-# ----------------------------------------------------------------------------
-# CP - Salin fail overlay dari template ke dalam jail
-# ----------------------------------------------------------------------------
+  
+# copy files
+CP root /
 CP usr /
 
-# ----------------------------------------------------------------------------
-# RENDER - Gantikan ARG values dalam fail konfigurasi
-# ----------------------------------------------------------------------------
-RENDER /usr/local/etc/odoo/odoo.conf
-RENDER /etc/rc.d/odoo
+# Apache configuration PHP disablle prefork, enable event 
+CMD sed -i '' '/mod_mpm_event.so/s/#LoadModule/LoadModule/' /usr/local/etc/apache24/httpd.conf
+CMD sed -i '' '/mod_mpm_prefork.so/s/LoadModule/#LoadModule/' /usr/local/etc/apache24/httpd.conf
+CMD sed -i '' '/mod_proxy.so/s/#LoadModule/LoadModule/' /usr/local/etc/apache24/httpd.conf
+CMD sed -i '' '/mod_proxy_fcgi.so/s/#LoadModule/LoadModule/' /usr/local/etc/apache24/httpd.conf
+CMD sed -i '' 's%ServerAdmin you@example.com%ServerAdmin admin@${JAIL_IP}%g' /usr/local/etc/apache24/extra/httpd-ssl.conf
+CMD sed -i '' 's%ServerName www.example.com:443%ServerName ${JAIL_IP}:443%g' /usr/local/etc/apache24/extra/httpd-ssl.conf
+CMD printf '<?php phpinfo(); ?>\n\n' > /usr/local/www/apache24/data/info.php
 
-# Tetapkan permission rc script
-CMD chmod 755 /etc/rc.d/odoo
+# SSL
+#CMD sed -i '' '/mod_socache_shmcb.so/s/#LoadModule/LoadModule/' /usr/local/etc/apache24/httpd.conf
+#CMD sed -i '' '/mod_ssl.so/s/#LoadModule/LoadModule/' /usr/local/etc/apache24/httpd.conf
+#CMD sed -i '' '/httpd-ssl.conf/s/#Include/Include/' /usr/local/etc/apache24/httpd.conf
+#CMD sed -i '' '/mod_rewrite.so/s/#LoadModule/LoadModule/' /usr/local/etc/apache24/httpd.conf
+#CMD echo '' >> /usr/local/etc/apache24/httpd.conf
+#CMD echo 'RewriteEngine On' >> /usr/local/etc/apache24/httpd.conf
+#CMD echo 'RewriteCond %{HTTPS} !=on' >> /usr/local/etc/apache24/httpd.conf
+#CMD echo 'RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]' >> /usr/local/etc/apache24/httpd.conf
 
-# ----------------------------------------------------------------------------
-# SERVICE - Mulakan servis
-# ----------------------------------------------------------------------------
-SERVICE odoo start
+# Apps configuration PHPMyAdmin
+#CMD mysql -u root -e "CREATE DATABASE IF NOT EXISTS phpmyadmin;"
+#CMD mysql -u root -e "CREATE USER IF NOT EXISTS pma@'localhost' identified by 'pmapass'"
+#CMD mysql -u root -e "GRANT ALL PRIVILEGES on phpmyadmin.* to pma@'localhost'"
+#CMD mysql -u root -e "FLUSH PRIVILEGES"
+#CMD cd /usr/local/www/phpMyAdmin/sql && mysql < create_tables.sql
 
-# ----------------------------------------------------------------------------
-# RDR - Redirect port dari host ke jail (uncomment jika diperlukan)
-# Nota: Gunakan bastille rdr selepas template diapply
-# ----------------------------------------------------------------------------
-# RDR tcp ${ODOO_PORT} ${ODOO_PORT}
-# RDR tcp ${ODOO_LONGPOLL_PORT} ${ODOO_LONGPOLL_PORT}
+#CMD sed -i '' 's%Require ip 127.0.0.1 xx.xx.xx.xx%Require ip 127.0.0.1 ${JAIL_IP}%g' /usr/local/etc/apache24/Includes/phpmyadmin.conf
+#CMD cp /usr/local/etc/apache24/Includes/phpmyadmin.conf.sample /usr/local/etc/apache24/Includes/phpmyadmin.conf
+#CMD chown -R www:www /usr/local/www/phpMyAdmin
+
+SERVICE php_fpm restart
+SERVICE apache24 restart
